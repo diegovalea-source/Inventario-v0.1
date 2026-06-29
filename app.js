@@ -190,7 +190,7 @@
 
   function metaText(item) {
     const bits = [escapeHtml(item.area)];
-    bits.push(item.referencia ? `Ref. ${escapeHtml(item.referencia)}` : '<span class="missing-ref">Sin ref.</span>');
+    bits.push(item.codigoBarras ? `Cód. barras ${escapeHtml(item.codigoBarras)}` : '<span class="missing-ref">Sin cód. barras</span>');
     if (typeof item.coste === "number") bits.push(`Coste ${item.coste.toLocaleString("es-ES", { maximumFractionDigits: 3 })}`);
     if (typeof item.stockExcel === "number") bits.push(`Excel ${item.stockExcel.toLocaleString("es-ES", { maximumFractionDigits: 2 })}`);
     return bits.join(" · ");
