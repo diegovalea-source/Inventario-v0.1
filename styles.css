@@ -231,6 +231,11 @@ textarea {
   font-size: 0.78rem;
 }
 
+.missing-ref {
+  color: #c02626;
+  font-weight: 800;
+}
+
 .section {
   color: var(--brand);
   font-weight: 800;
@@ -303,7 +308,8 @@ details textarea {
 }
 
 .primary,
-.secondary {
+.secondary,
+.manager {
   min-height: 46px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -320,6 +326,12 @@ details textarea {
   background: white;
   color: var(--brand-dark);
   border-color: var(--line);
+}
+
+.manager {
+  grid-column: 1 / -1;
+  background: var(--accent);
+  color: white;
 }
 
 @media (min-width: 760px) {
@@ -342,9 +354,14 @@ details textarea {
 
   .actionbar {
     position: sticky;
+    grid-template-columns: repeat(3, 1fr);
     width: min(920px, calc(100% - 28px));
     margin: 0 auto 14px;
     border: 1px solid var(--line);
     border-radius: 8px;
+  }
+
+  .manager {
+    grid-column: auto;
   }
 }
