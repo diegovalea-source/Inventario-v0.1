@@ -199,12 +199,12 @@
   function exportExcel() {
     const detailRows = buildDetailRows();
     const summaryRows = buildSummaryRows(detailRows);
-    const xml = buildExcelXml(summaryRows, detailRows);
-    const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const workbook = buildXlsx(summaryRows, detailRows);
+    const blob = new Blob([workbook], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `inventario-valorado-${dateStamp()}.xls`;
+    a.download = `inventario-valorado-${dateStamp()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -382,6 +382,162 @@
   function styleAttr(style) {
     return style ? ` ss:StyleID="${style}"` : "";
   }
+
+  function buildXlsx(summaryRows, detailRows) {
+    const totalProducts = detailRows.length;
+    const countedProducts = detailRows.filter((row) => row.counted === "Sí").length;
+    const totalValue = detailRows.reduce((sum, row) => sum + row.value, 0);
+    const generated = new Date().toLocaleString("es-ES");
+    const areaRows = buildAreaRows(summaryRows);
+
+    const summarySheet = worksheetXml([
+      xlsxRow([xlsxText("Inventario valorado", 1)]),
+      xlsxRow([xlsxText(`Generado: ${generated}`, 2)]),
+      xlsxRow([]),
+      xlsxRow([xlsxText("Total inventario", 3), xlsxNumber(totalValue, 6)]),
+      xlsxRow([xlsxText("Productos contados", 3), xlsxNumber(countedProducts, 4)]),
+      xlsxRow([xlsxText("Productos totales", 3), xlsxNumber(totalProducts, 4)]),
+      xlsxRow([]),
+      xlsxRow([xlsxText("Área", 3), xlsxText("Contados", 3), xlsxText("Valor €", 3)]),
+      ...areaRows.map((row) => xlsxRow([
+        xlsxText(row.area),
+        xlsxNumber(row.counted, 4),
+        xlsxNumber(row.value, 6),
+      ])),
+    ], [24, 14, 16]);
+
+    const detailSheet = worksheetXml([
+      xlsxRow([
+        xlsxText("Área", 3),
+        xlsxText("Sección", 3),
+        xlsxText("Referencia", 3),
+        xlsxText("Producto", 3),
+        xlsxText("Recuento", 3),
+        xlsxText("Último coste", 3),
+        xlsxText("Valor €", 3),
+        xlsxText("Contado", 3),
+        xlsxText("Nota", 3),
+      ]),
+      ...detailRows.map((row) => xlsxRow([
+        xlsxText(row.area),
+        xlsxText(row.section),
+        xlsxText(row.reference),
+        xlsxText(row.product),
+        xlsxNumber(row.qty, 5),
+        xlsxNumber(row.cost, 6),
+        xlsxNumber(row.value, 6),
+        xlsxText(row.counted),
+        xlsxText(row.note),
+      ])),
+    ], [16, 24, 14, 42, 12, 14, 14, 10, 34]);
+
+    return zipStore({
+      "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+      "_rels/.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+      "xl/workbook.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Resumen" sheetId="1" r:id="rId1"/><sheet name="Detalle" sheetId="2" r:id="rId2"/></sheets></workbook>`,
+      "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+      "xl/styles.xml": xlsxStylesXml(),
+      "xl/worksheets/sheet1.xml": summarySheet,
+      "xl/worksheets/sheet2.xml": detailSheet,
+    });
+  }
+
+  function buildAreaRows(summaryRows) {
+    const byArea = new Map();
+    summaryRows.forEach((row) => {
+      const current = byArea.get(row.area) || { area: row.area, counted: 0, value: 0 };
+      current.counted += row.counted;
+      current.value += row.value;
+      byArea.set(row.area, current);
+    });
+    return Array.from(byArea.values());
+  }
+
+  function worksheetXml(rows, widths) {
+    const cols = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("");
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData></worksheet>`;
+  }
+
+  function xlsxRow(cells) {
+    return `<row>${cells.join("")}</row>`;
+  }
+
+  function xlsxText(value, styleId = 0) {
+    return `<c t="inlineStr"${styleId ? ` s="${styleId}"` : ""}><is><t>${xmlEscape(value)}</t></is></c>`;
+  }
+
+  function xlsxNumber(value, styleId = 0) {
+    const number = Number.isFinite(value) ? value : 0;
+    return `<c${styleId ? ` s="${styleId}"` : ""}><v>${number}</v></c>`;
+  }
+
+  function xlsxStylesXml() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="0.00"/><numFmt numFmtId="166" formatCode="#,##0.00 €"/></numFmts><fonts count="4"><font><sz val="11"/><color rgb="FF18211F"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF1F6F68"/><name val="Calibri"/></font><font><sz val="11"/><color rgb="FF68716E"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F6F68"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  }
+
+  function zipStore(files) {
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+    Object.entries(files).forEach(([name, content]) => {
+      const nameBytes = encoder.encode(name);
+      const data = encoder.encode(content);
+      const crc = crc32(data);
+      const localHeader = zipHeader(0x04034b50, [[20, 2], [0, 2], [0, 2], [0, 2], [0, 2], [crc, 4], [data.length, 4], [data.length, 4], [nameBytes.length, 2], [0, 2]]);
+      localParts.push(localHeader, nameBytes, data);
+      const centralHeader = zipHeader(0x02014b50, [[20, 2], [20, 2], [0, 2], [0, 2], [0, 2], [0, 2], [crc, 4], [data.length, 4], [data.length, 4], [nameBytes.length, 2], [0, 2], [0, 2], [0, 2], [0, 2], [0, 4], [offset, 4]]);
+      centralParts.push(centralHeader, nameBytes);
+      offset += localHeader.length + nameBytes.length + data.length;
+    });
+    const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+    const fileCount = Object.keys(files).length;
+    const end = zipHeader(0x06054b50, [[0, 2], [0, 2], [fileCount, 2], [fileCount, 2], [centralSize, 4], [offset, 4], [0, 2]]);
+    return concatBytes([...localParts, ...centralParts, end]);
+  }
+
+  function zipHeader(signature, fields) {
+    const bytes = new Uint8Array(4 + fields.reduce((sum, field) => sum + field[1], 0));
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, signature, true);
+    let cursor = 4;
+    fields.forEach(([value, length]) => {
+      if (length === 2) view.setUint16(cursor, value, true);
+      if (length === 4) view.setUint32(cursor, value >>> 0, true);
+      cursor += length;
+    });
+    return bytes;
+  }
+
+  function concatBytes(parts) {
+    const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+    let cursor = 0;
+    parts.forEach((part) => {
+      bytes.set(part, cursor);
+      cursor += part.length;
+    });
+    return bytes;
+  }
+
+  function crc32(bytes) {
+    let crc = -1;
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[index]) & 0xff];
+    }
+    return (crc ^ -1) >>> 0;
+  }
+
+  const CRC_TABLE = (() => {
+    const table = [];
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+      }
+      table[index] = value >>> 0;
+    }
+    return table;
+  })();
 
   async function copySummary() {
     const counted = items.filter((item) => hasCount(item.id));
