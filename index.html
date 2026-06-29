@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f6f68">
+  <title>Inventario mensual</title>
+  <link rel="icon" href="icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Junio 2026</p>
+      <h1>Inventario</h1>
+    </div>
+    <button id="exportBtn" class="icon-button" type="button" aria-label="Exportar resultados" title="Exportar resultados">
+      <span aria-hidden="true">⇩</span>
+    </button>
+  </header>
+
+  <main>
+    <section class="summary" aria-label="Resumen">
+      <div>
+        <strong id="countedValue">0</strong>
+        <span>contados</span>
+      </div>
+      <div>
+        <strong id="pendingValue">0</strong>
+        <span>pendientes</span>
+      </div>
+      <div>
+        <strong id="totalValue">0</strong>
+        <span>productos</span>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="Filtros">
+      <label class="search">
+        <span>Buscar</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Producto, sección o archivo">
+      </label>
+      <div class="filter-row">
+        <label>
+          <span>Área</span>
+          <select id="areaFilter"></select>
+        </label>
+        <label>
+          <span>Estado</span>
+          <select id="statusFilter">
+            <option value="all">Todos</option>
+            <option value="pending">Pendientes</option>
+            <option value="counted">Contados</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="section-tabs" aria-label="Secciones">
+      <div id="sectionTabs" class="tabs"></div>
+    </section>
+
+    <section id="itemList" class="item-list" aria-live="polite"></section>
+  </main>
+
+  <footer class="actionbar">
+    <button id="clearBtn" class="secondary" type="button">Limpiar recuento</button>
+    <button id="copyBtn" class="primary" type="button">Copiar resumen</button>
+  </footer>
+
+  <template id="itemTemplate">
+    <article class="item">
+      <div class="item-main">
+        <p class="section"></p>
+        <h2></h2>
+        <p class="meta"></p>
+      </div>
+      <div class="counter">
+        <button class="step down" type="button" aria-label="Restar">−</button>
+        <input class="qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
+        <button class="step up" type="button" aria-label="Sumar">+</button>
+      </div>
+      <details>
+        <summary>Nota</summary>
+        <textarea rows="2" placeholder="Caja abierta, revisar, ubicación..."></textarea>
+      </details>
+    </article>
+  </template>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
