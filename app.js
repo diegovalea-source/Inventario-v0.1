@@ -556,9 +556,12 @@
   }
 
   function loadCounts() {
-    localStorage.removeItem(STORAGE_KEY);
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch {
     return {};
   }
+}
 
   function saveCounts() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.counts));
